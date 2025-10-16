@@ -254,30 +254,59 @@
 
     async function connect() {
       try {
+        // Check if Web Bluetooth is available
+        if (!navigator.bluetooth) {
+          alert('Web Bluetooth is not supported in this browser. Please use Bluefy or another browser with Web Bluetooth support.');
+          return;
+        }
+
+        console.log('Requesting Bluetooth Device...');
+        
+        // Try with just the service UUID in filters
         const device = await navigator.bluetooth.requestDevice({
           filters: [
-            { services: [0xffe0] }
-          ],
-          optionalServices: [0xffe0, 0xffe1]
+            { services: ['0000ffe0-0000-1000-8000-00805f9b34fb'] }
+          ]
         });
+        
+        console.log('Device selected:', device.name);
+        console.log('Connecting to GATT Server...');
         
         server = await device.gatt.connect();
         
+        console.log('Connected to GATT Server');
+        
         if (server !== null) {
-          document.getElementById("connection").innerHTML = 'Connected';
+          document.getElementById("connection").innerHTML = 'Connected: ' + device.name;
           console.log("Connected! Server: ", server);
         }
+        
+        // Add disconnect handler
+        device.addEventListener('gattserverdisconnected', onDisconnected);
         
         return server;
       } catch (error) {
         console.error("Connection error:", error);
-        document.getElementById("connection").innerHTML = 'Connection Failed';
-        alert('Connection failed: ' + error.message);
+        document.getElementById("connection").innerHTML = 'Select device';
+        
+        if (error.name === 'NotFoundError') {
+          alert('No device found. Make sure your Revopoint device is turned on and in pairing mode.');
+        } else if (error.name === 'SecurityError') {
+          alert('Security error. Make sure you are using HTTPS.');
+        } else {
+          alert('Connection failed: ' + error.message);
+        }
       }
     }
 
+    function onDisconnected(event) {
+      console.log('Device disconnected');
+      document.getElementById("connection").innerHTML = 'Select device';
+      server = null;
+    }
+
     async function bluetoothSend(cmd) {
-      if (!server) {
+      if (!server || !server.connected) {
         alert('Please connect to device first');
         return;
       }
@@ -287,8 +316,8 @@
           console.log(cmd);
         }
         var enc = new TextEncoder();
-        const service = await server.getPrimaryService(0xffe0);
-        const characteristic = await service.getCharacteristic(0xffe1);
+        const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+        const characteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
         await characteristic.writeValue(enc.encode(cmd));
         var read = await characteristic.readValue();
 
