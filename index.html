@@ -236,12 +236,6 @@
     </tr>
   </table>
   <script>
-    /**
-     * Mit nRFConnect verbinden
-     * Services anschauen und die wo man braucht beim verbinden angeben
-     * Schauen in welchen PrimaryService der Befehl / Characteristic geschrieben werden muss
-     **/
-
     var debuglog = false;
     let server = false;
     let tiltvalue = 0;
@@ -255,37 +249,56 @@
     var sendcommand = 0;
     var pause = false;
 
-
-    var rws_status = false; // rotate with steps trigger
+    var rws_status = false;
     var rws_pause = false;
 
-
     async function connect() {
-      const device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: [0xffe0, 0xffe1],
-      });
-      server = await device.gatt.connect();
-      if (server !== null) {
-        document.getElementById("connection").innerHTML = 'Connected'
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [
+            { services: [0xffe0] }
+          ],
+          optionalServices: [0xffe0, 0xffe1]
+        });
+        
+        server = await device.gatt.connect();
+        
+        if (server !== null) {
+          document.getElementById("connection").innerHTML = 'Connected';
+          console.log("Connected! Server: ", server);
+        }
+        
+        return server;
+      } catch (error) {
+        console.error("Connection error:", error);
+        document.getElementById("connection").innerHTML = 'Connection Failed';
+        alert('Connection failed: ' + error.message);
       }
-      console.log("Connected! Server: ", server);
-      return server;
     }
 
     async function bluetoothSend(cmd) {
-      if (debuglog == true) {
-        console.log(cmd);
+      if (!server) {
+        alert('Please connect to device first');
+        return;
       }
-      var enc = new TextEncoder();
-      const service = await server.getPrimaryService(0xffe0);
-      const characteristic = await service.getCharacteristic(0xffe1);
-      await characteristic.writeValue(enc.encode(cmd));
-      var read = await characteristic.readValue();
+      
+      try {
+        if (debuglog == true) {
+          console.log(cmd);
+        }
+        var enc = new TextEncoder();
+        const service = await server.getPrimaryService(0xffe0);
+        const characteristic = await service.getCharacteristic(0xffe1);
+        await characteristic.writeValue(enc.encode(cmd));
+        var read = await characteristic.readValue();
 
-      var read_string = await new TextDecoder().decode(read);
+        var read_string = await new TextDecoder().decode(read);
 
-      return await read_string;
+        return await read_string;
+      } catch (error) {
+        console.error("Bluetooth send error:", error);
+        alert('Communication error: ' + error.message);
+      }
     }
 
     async function set_rotation_speed(event) {
@@ -308,7 +321,6 @@
       }
     }
 
-    /**Disable CSS Code**/
     document.getElementById("discss").onclick = function () {
       document.styleSheets[0].disabled = !document.styleSheets[0].disabled;
     }
