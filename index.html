@@ -262,19 +262,33 @@
 
         console.log('Requesting Bluetooth Device...');
         
-        // Try with just the service UUID in filters
+        // Use the exact device name
         const device = await navigator.bluetooth.requestDevice({
           filters: [
-            { services: ['0000ffe0-0000-1000-8000-00805f9b34fb'] }
-          ]
+            { name: 'REVO_DUAL_AXIS_TABLE' }
+          ],
+          optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb', '0000ffe1-0000-1000-8000-00805f9b34fb']
         });
         
         console.log('Device selected:', device.name);
+        console.log('Device ID:', device.id);
         console.log('Connecting to GATT Server...');
         
         server = await device.gatt.connect();
         
         console.log('Connected to GATT Server');
+        console.log('Discovering services...');
+        
+        // Try to discover what services are available
+        try {
+          const services = await server.getPrimaryServices();
+          console.log('Available services:');
+          for (const service of services) {
+            console.log('- Service UUID:', service.uuid);
+          }
+        } catch (e) {
+          console.log('Could not enumerate services:', e);
+        }
         
         if (server !== null) {
           document.getElementById("connection").innerHTML = 'Connected: ' + device.name;
@@ -290,7 +304,7 @@
         document.getElementById("connection").innerHTML = 'Select device';
         
         if (error.name === 'NotFoundError') {
-          alert('No device found. Make sure your Revopoint device is turned on and in pairing mode.');
+          alert('No device found. Make sure your Revopoint device is turned on and nearby.');
         } else if (error.name === 'SecurityError') {
           alert('Security error. Make sure you are using HTTPS.');
         } else {
